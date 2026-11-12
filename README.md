@@ -2,9 +2,11 @@
 
 Telegram Mini App for logging a gym session. It is a single static page (no build) served by GitHub Pages from the root of `main`:
 
-**https://mastergrok.github.io/gym_buddy/**
+**https://mastergrok.github.io/Gym_buddy/**
 
-Open that URL for the default session. Finished sets, edits and the running rest timer are stored in `localStorage`, keyed by the programme, so closing the page does not drop progress. **Terminer** clears that saved state.
+GitHub Pages uses the repository name as written (`Gym_buddy`). The lowercase path `https://mastergrok.github.io/gym_buddy/` is not served.
+
+Open the URL above for the default session. Finished sets, edits and the running rest timer are stored in `localStorage`, keyed by the programme, so closing the page does not drop progress. **Terminer** clears that saved state.
 
 ## Programme query param `p`
 
@@ -43,10 +45,10 @@ Encode in Node:
 
 ```js
 const p = Buffer.from(JSON.stringify(programme)).toString('base64url');
-const url = 'https://mastergrok.github.io/gym_buddy/?p=' + p;
+const url = 'https://mastergrok.github.io/Gym_buddy/?p=' + p;
 ```
 
-Example (bench + L-sit): <https://mastergrok.github.io/gym_buddy/?p=eyJ0aXRsZSI6IlBvdXNzw6llIiwiZXhlcmNpc2VzIjpbeyJuYW1lIjoiRMOpdmVsb3Bww6kgY291Y2jDqSBiYXJyZSIsInNldHMiOjQsInJlcHMiOjEwLCJ3ZWlnaHQiOjYwLCJ1bml0Ijoia2ciLCJyZXN0IjoxMjB9LHsibmFtZSI6Ikwtc2l0Iiwic2V0cyI6NCwic2Vjb25kcyI6MTUsInJlc3QiOjYwfV19>
+Example (bench + L-sit): <https://mastergrok.github.io/Gym_buddy/?p=eyJ0aXRsZSI6IlBvdXNzw6llIiwiZXhlcmNpc2VzIjpbeyJuYW1lIjoiRMOpdmVsb3Bww6kgY291Y2jDqSBiYXJyZSIsInNldHMiOjQsInJlcHMiOjEwLCJ3ZWlnaHQiOjYwLCJ1bml0Ijoia2ciLCJyZXN0IjoxMjB9LHsibmFtZSI6Ikwtc2l0Iiwic2V0cyI6NCwic2Vjb25kcyI6MTUsInJlc3QiOjYwfV19>
 
 ## Reply-keyboard `web_app` button
 
@@ -55,7 +57,7 @@ Example (bench + L-sit): <https://mastergrok.github.io/gym_buddy/?p=eyJ0aXRsZSI6
 ```python
 from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
-url = "https://mastergrok.github.io/gym_buddy/?p=" + p
+url = "https://mastergrok.github.io/Gym_buddy/?p=" + p
 markup = ReplyKeyboardMarkup(
     [[KeyboardButton(text="Séance", web_app=WebAppInfo(url=url))]],
     resize_keyboard=True,
@@ -69,7 +71,7 @@ Raw Bot API `reply_markup`:
 {
   "keyboard": [[{
     "text": "Séance",
-    "web_app": {"url": "https://mastergrok.github.io/gym_buddy/?p=..."}
+    "web_app": {"url": "https://mastergrok.github.io/Gym_buddy/?p=..."}
   }]],
   "resize_keyboard": true
 }

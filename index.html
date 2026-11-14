@@ -471,6 +471,10 @@
     #avatar-preview h2 { font-size: 1rem; margin: 0 0 10px; }
     #avatar-preview-graphic { min-height: 220px; display: flex; align-items: center; }
     #avatar-preview-graphic .fig { width: 100%; height: min(50vh, 300px); }
+    .exercise-gif { display:block; width:100%; height:100%; object-fit:contain; border-radius:8px; }
+    #avatar-preview-graphic .exercise-gif { width:100%; height:min(55vh, 340px); }
+    .gif-pending { display:flex; align-items:center; justify-content:center; width:100%; height:100%; padding:4px; color:var(--hint); font-size:.67rem; text-align:center; line-height:1.25; }
+    #avatar-preview-graphic .gif-pending { min-height:180px; font-size:.9rem; }
     #avatar-preview-close {
       display: block;
       width: 100%;
@@ -606,7 +610,7 @@
   <noscript>Activez JavaScript pour suivre la séance.</noscript>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="./gym_buddy_avatars.js?v=2"></script>
+  <!-- Illustrated GIF library: batch 01 -->
   <script>
 (function () {
   'use strict';
@@ -648,9 +652,10 @@
 
   var list = document.getElementById('exercise-list');
   var finishBtn = document.getElementById('finish-btn');
-  var avatarGender = 'male';
+  var avatarGender = 'female';
   try {
-    if (localStorage.getItem('gymbuddy:avatar') === 'female') avatarGender = 'female';
+    var savedAvatar = localStorage.getItem('gymbuddy:avatar');
+    if (savedAvatar === 'female' || savedAvatar === 'male') avatarGender = savedAvatar;
   } catch (e) {}
   function syncAvatarButtons() {
     document.querySelectorAll('.avatar-btn').forEach(function (button) {
@@ -1450,6 +1455,22 @@
     return renderKind(safe).replace('<svg ', '<svg data-kind="' + safe + '" ');
   }
 
+  // Only show an exercise-specific GIF if it has actually been produced.
+  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif"]);
+  function gifKey(name) {
+    var n = foldName(name);
+    if (/^(developpe couche barre|barbell bench press|bench press barre|developpe couche)$/.test(n)) return 'bench-bar';
+    if (/^(tractions? pronation|pull ups?|pullups?|tractions?)$/.test(n)) return 'pullup-pronation';
+    if (/^(squat barre|barbell back squat|back squat)$/.test(n)) return 'squat-bar';
+    if (/^(elevations? laterales? halteres?|dumbbell lateral raises?|elevations? laterales?)$/.test(n)) return 'lateral-raise';
+    return '';
+  }
+  function renderExerciseGif(name) {
+    var key = gifKey(name), file = avatarGender + '/' + key + '.gif';
+    if (!key || !GIF_ASSETS.has(file)) return '<span class="gif-pending">GIF à venir</span>';
+    if (prefersStill()) return '<span class="gif-pending">Animation désactivée</span>';
+    return '<img class="exercise-gif" src="./assets/exercises/' + file + '" alt="" decoding="async">';
+  }
   function renderAll() {
     renderHeader();
     renderExercises();
@@ -1493,11 +1514,9 @@
       var kind = 'generic';
       try { kind = animKind(ex.name); } catch (e) {}
       try {
-        anim.innerHTML = window.GymBuddyAvatar
-          ? window.GymBuddyAvatar.render(ex.name, avatarGender, prefersStill())
-          : buildFig(kind);
+        anim.innerHTML = renderExerciseGif(ex.name);
       } catch (e2) {
-        try { anim.innerHTML = buildFig(kind); } catch (e3) {}
+        anim.textContent = 'GIF à venir';
       }
       var h2 = document.createElement('h2');
       h2.textContent = ex.name;
@@ -2170,9 +2189,7 @@
     if (previewBtn) {
       var previewDialog = document.getElementById('avatar-preview');
       document.getElementById('avatar-preview-title').textContent = previewBtn.dataset.exercise;
-      document.getElementById('avatar-preview-graphic').innerHTML = window.GymBuddyAvatar
-        ? window.GymBuddyAvatar.render(previewBtn.dataset.exercise, avatarGender, prefersStill())
-        : previewBtn.innerHTML;
+      document.getElementById('avatar-preview-graphic').innerHTML = renderExerciseGif(previewBtn.dataset.exercise);
       if (typeof previewDialog.showModal === 'function' && !previewDialog.open) previewDialog.showModal();
       else previewDialog.setAttribute('open', '');
       return;

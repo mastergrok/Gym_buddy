@@ -1456,9 +1456,13 @@
   }
 
   // Only show an exercise-specific GIF if it has actually been produced.
-  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif"]);
+  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif"]);
   function gifKey(name) {
     var n = foldName(name);
+    if (/^(rowing halteres? sur banc|rowing un bras sur banc|one arm dumbbell row|single arm dumbbell row|tirage halteres? sur banc)$/.test(n)) return 'row-db-bench';
+    if (/^(fentes? arriere|reverse lunges?)$/.test(n)) return 'reverse-lunge';
+    if (/^(developpe couche halteres?|dumbbell bench press|bench press halteres?)$/.test(n)) return 'bench-db';
+    if (/^(souleve de terre roumain|romanian deadlift|rdl|souleve de terre jambes semi tendues)$/.test(n)) return 'rdl';
     if (/^(dips|parallel bar dips|bar dips)$/.test(n)) return 'dips';
     if (/^(developpe couche barre|barbell bench press|bench press barre|developpe couche)$/.test(n)) return 'bench-bar';
     if (/^(tractions? pronation|pull ups?|pullups?|tractions?)$/.test(n)) return 'pullup-pronation';

@@ -157,7 +157,11 @@
       flex: none;
       width: 90px;
       height: 68px;
-      pointer-events: none;
+      cursor: zoom-in;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
       overflow: hidden;
     }
     .avatar-picker {
@@ -453,6 +457,31 @@
       color: var(--text);
     }
 
+    #avatar-preview {
+      width: min(440px, calc(100vw - 24px));
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+      border-radius: 18px;
+      padding: 16px;
+      background: var(--section);
+      color: var(--text);
+    }
+    #avatar-preview::backdrop { background: rgba(0, 0, 0, .75); }
+    #avatar-preview h2 { font-size: 1rem; margin: 0 0 10px; }
+    #avatar-preview-graphic { min-height: 220px; display: flex; align-items: center; }
+    #avatar-preview-graphic .fig { width: 100%; height: min(50vh, 300px); }
+    #avatar-preview-close {
+      display: block;
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px;
+      margin-top: 10px;
+      background: var(--btn);
+      color: var(--btn-text);
+      font-weight: 650;
+    }
     #summary[open] {
       display: flex;
       flex-direction: column;
@@ -567,6 +596,11 @@
       <button type="button" id="summary-copy">Copier</button>
       <button type="button" id="summary-close">Fermer</button>
     </div>
+  </dialog>
+  <dialog id="avatar-preview" aria-labelledby="avatar-preview-title">
+    <h2 id="avatar-preview-title">Animation</h2>
+    <div id="avatar-preview-graphic"></div>
+    <button type="button" id="avatar-preview-close">Fermer</button>
   </dialog>
   <p id="live" class="sr-only" aria-live="polite"></p>
   <noscript>Activez JavaScript pour suivre la séance.</noscript>
@@ -1451,9 +1485,11 @@
       head.className = 'ex-head';
       var nameWrap = document.createElement('div');
       nameWrap.className = 'ex-name';
-      var anim = document.createElement('div');
+      var anim = document.createElement('button');
+      anim.type = 'button';
       anim.className = 'ex-anim';
-      anim.setAttribute('aria-hidden', 'true');
+      anim.setAttribute('aria-label', 'Agrandir l’animation : ' + ex.name);
+      anim.dataset.exercise = ex.name;
       var kind = 'generic';
       try { kind = animKind(ex.name); } catch (e) {}
       try {
@@ -2130,6 +2166,17 @@
   }, true);
 
   list.addEventListener('click', function (e) {
+    var previewBtn = e.target.closest('.ex-anim');
+    if (previewBtn) {
+      var previewDialog = document.getElementById('avatar-preview');
+      document.getElementById('avatar-preview-title').textContent = previewBtn.dataset.exercise;
+      document.getElementById('avatar-preview-graphic').innerHTML = window.GymBuddyAvatar
+        ? window.GymBuddyAvatar.render(previewBtn.dataset.exercise, avatarGender, prefersStill())
+        : previewBtn.innerHTML;
+      if (typeof previewDialog.showModal === 'function' && !previewDialog.open) previewDialog.showModal();
+      else previewDialog.setAttribute('open', '');
+      return;
+    }
     var saveBtn = e.target.closest('[data-action="save-edit"]');
     if (saveBtn) { commitEdit(); return; }
     var cancelBtn = e.target.closest('[data-action="cancel-edit"]');
@@ -2185,6 +2232,11 @@
     if (e.target.closest('.set') || e.target.closest('.edit')) e.preventDefault();
   });
 
+  document.getElementById('avatar-preview-close').addEventListener('click', function () {
+    var dlg = document.getElementById('avatar-preview');
+    if (typeof dlg.close === 'function' && dlg.open) dlg.close();
+    else dlg.removeAttribute('open');
+  });
   finishBtn.addEventListener('click', onFinish);
   document.getElementById('rest-plus').addEventListener('click', function () { adjustRest(15000); });
   document.getElementById('rest-minus').addEventListener('click', function () { adjustRest(-15000); });

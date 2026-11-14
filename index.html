@@ -1456,9 +1456,10 @@
   }
 
   // Only show an exercise-specific GIF if it has actually been produced.
-  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/goblet-squat.gif","female/pushup.gif","female/lat-pulldown.gif","female/leg-press.gif","female/curl-db.gif"]);
+  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/goblet-squat.gif","female/pushup.gif","female/lat-pulldown.gif","female/leg-press.gif","female/curl-db.gif","female/curl-bar.gif"]);
   function gifKey(name) {
     var n = foldName(name);
+    if (/^(curl barre|barbell curls?|curl biceps barre)$/.test(n)) return 'curl-bar';
     if (/^(curl halteres?|dumbbell curls?|curl biceps halteres?)$/.test(n)) return 'curl-db';
     if (/^(leg press|presse a cuisses|presse a jambes)$/.test(n)) return 'leg-press';
     if (/^(tirage vertical poulie haute|tirage vertical|lat pulldown)$/.test(n)) return 'lat-pulldown';

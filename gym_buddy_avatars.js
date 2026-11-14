@@ -94,6 +94,7 @@
     if(what.indexOf('barbell')>=0){
       s+=at(poses,function(p){return mid(p.wl,p.wr);},'load','<path d="M -27 0 H 27" stroke="#9ba9b5" stroke-width="2.8"/><path d="M -25 -6 V 6 M -21 -5 V 5 M 21 -5 V 5 M 25 -6 V 6" stroke="#fa9e37" stroke-width="4.5"/>',still,dur);
     }
+    if(what.indexOf('belt')>=0)s+=at(poses,'p','belt-load','<path d="M -5 1 Q 0 7 5 1" fill="none" stroke="#abb4bf" stroke-width="1.6"/><circle cx="0" cy="8" r="4.2" fill="#f69b35" stroke="#ffcb81" stroke-width=".8"/>',still,dur);
     if(what.indexOf('kettlebell')>=0)s+=at(poses,'wl','load','<path d="M -3 -4 V -7 Q 0 -10 3 -7 V -4" fill="none" stroke="#ffd09d" stroke-width="1.5"/><circle cy="0" r="5" fill="#f69b35"/>',still,dur);
     if(what.indexOf('cable')>=0)s+=path(poses,function(p){return 'M 88 15 L '+pt(p.wr);},'cableline',1,still,dur);
     return s;
@@ -104,7 +105,7 @@
     switch(kind){
       case 'pull-pron':case 'pull-sup':case 'pull-neutral':case 'pull-weighted':
         a=HANG;b=P(HANG,{h:v(50,19),s:v(50,29),p:v(50,44),el:v(37,25),er:v(63,25),kl:v(45,54),kr:v(55,54),al:v(47,64),ar:v(53,64)});
-        return D(a,b,'pullbar'+(kind==='pull-weighted'?' weight':''),{duration:2.2});
+        return D(a,b,'pullbar'+(kind==='pull-weighted'?' belt':''),{duration:2.2});
       case 'muscleup':
         a=HANG;b=P(HANG,{h:v(50,7),s:v(50,21),p:v(50,35),el:v(42,26),er:v(58,26),wl:v(37,13),wr:v(63,13),kl:v(46,48),kr:v(54,48),al:v(46,59),ar:v(54,59)});
         return D(a,b,'pullbar',{duration:2.6});
@@ -165,7 +166,7 @@
         return D(a,b,kind==='cablefly'?'floor cable':'seat machine',{duration:2.2});
       case 'dips':case 'dips-weighted':
         a=DIP;b=P(DIP,{h:v(50,22),s:v(50,34),p:v(50,51),el:v(41,45),er:v(59,45),kl:v(44,61),kr:v(56,61),al:v(45,69),ar:v(55,69)});
-        return D(a,b,'dipbars'+(kind==='dips-weighted'?' weight':''),{duration:2});
+        return D(a,b,'dipbars'+(kind==='dips-weighted'?' belt':''),{duration:2});
       case 'pushup':case 'pushup-diamond':case 'pushup-decline':case 'pikepush':
         a=P(PUSH,kind==='pushup-diamond'?{wl:v(40,65),wr:v(42,65)}:{});
         b=P(a,{h:v(26,53),s:v(36,54),p:v(66,49),el:v(33,61),er:v(43,61)});

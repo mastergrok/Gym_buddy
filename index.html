@@ -610,7 +610,7 @@
   <noscript>Activez JavaScript pour suivre la séance.</noscript>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Illustrated GIF library: batch 02 -->
+  <!-- Illustrated GIF library: batch 03 -->
   <script>
 (function () {
   'use strict';
@@ -1456,9 +1456,10 @@
   }
 
   // Only show an exercise-specific GIF if it has actually been produced.
-  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif"]);
+  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif"]);
   function gifKey(name) {
     var n = foldName(name);
+    if (/^(dips|parallel bar dips|bar dips)$/.test(n)) return 'dips';
     if (/^(developpe couche barre|barbell bench press|bench press barre|developpe couche)$/.test(n)) return 'bench-bar';
     if (/^(tractions? pronation|pull ups?|pullups?|tractions?)$/.test(n)) return 'pullup-pronation';
     if (/^(developpe militaire halteres?|dumbbell overhead press|dumbbell shoulder press|developpe epaules? halteres?)$/.test(n)) return 'ohp-db';

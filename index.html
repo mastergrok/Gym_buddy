@@ -155,10 +155,36 @@
 
     .ex-anim {
       flex: none;
-      width: 66px;
-      height: 48px;
+      width: 90px;
+      height: 68px;
       pointer-events: none;
       overflow: hidden;
+    }
+    .avatar-picker {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .avatar-picker-label {
+      font-size: .76rem;
+      color: var(--hint);
+      margin-right: auto;
+    }
+    .avatar-btn {
+      border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: .82rem;
+      font-weight: 650;
+      min-height: 32px;
+    }
+    .avatar-btn[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--btn) 23%, var(--secondary));
+      border-color: var(--btn);
+      color: var(--text);
     }
 
     .fig {
@@ -503,6 +529,11 @@
       <div class="bar" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-labelledby="progress-label">
         <span id="progress-fill"></span>
       </div>
+      <div id="avatar-picker" class="avatar-picker" role="group" aria-label="Personnage des exercices">
+        <span class="avatar-picker-label">Personnage des animations</span>
+        <button type="button" class="avatar-btn" data-avatar="male" aria-pressed="true">Homme</button>
+        <button type="button" class="avatar-btn" data-avatar="female" aria-pressed="false">Femme</button>
+      </div>
     </header>
     <p class="hint" id="hint">Touchez une série pour la valider. Maintenez ou touchez ✎ pour corriger.</p>
     <main id="exercise-list"></main>
@@ -541,6 +572,7 @@
   <noscript>Activez JavaScript pour suivre la séance.</noscript>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="./gym_buddy_avatars.js?v=2"></script>
   <script>
 (function () {
   'use strict';
@@ -582,6 +614,24 @@
 
   var list = document.getElementById('exercise-list');
   var finishBtn = document.getElementById('finish-btn');
+  var avatarGender = 'male';
+  try {
+    if (localStorage.getItem('gymbuddy:avatar') === 'female') avatarGender = 'female';
+  } catch (e) {}
+  function syncAvatarButtons() {
+    document.querySelectorAll('.avatar-btn').forEach(function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.avatar === avatarGender));
+    });
+  }
+  document.getElementById('avatar-picker').addEventListener('click', function (event) {
+    var button = event.target.closest('.avatar-btn');
+    if (!button || (button.dataset.avatar !== 'male' && button.dataset.avatar !== 'female')) return;
+    if (button.dataset.avatar === avatarGender) return;
+    avatarGender = button.dataset.avatar;
+    try { localStorage.setItem('gymbuddy:avatar', avatarGender); } catch (e) {}
+    syncAvatarButtons();
+    renderExercises();
+  });
 
   function loadProgramme() {
     var params;
@@ -1406,7 +1456,13 @@
       anim.setAttribute('aria-hidden', 'true');
       var kind = 'generic';
       try { kind = animKind(ex.name); } catch (e) {}
-      try { anim.innerHTML = buildFig(kind); } catch (e2) {}
+      try {
+        anim.innerHTML = window.GymBuddyAvatar
+          ? window.GymBuddyAvatar.render(ex.name, avatarGender, prefersStill())
+          : buildFig(kind);
+      } catch (e2) {
+        try { anim.innerHTML = buildFig(kind); } catch (e3) {}
+      }
       var h2 = document.createElement('h2');
       h2.textContent = ex.name;
       nameWrap.append(anim, h2);
@@ -2155,6 +2211,7 @@
   } catch (e) {}
 
   restore();
+  syncAvatarButtons();
   renderAll();
   tickClock();
   setInterval(tickClock, 250);

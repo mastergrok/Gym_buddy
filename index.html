@@ -610,7 +610,7 @@
   <noscript>Activez JavaScript pour suivre la séance.</noscript>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Illustrated GIF library: batch 03 -->
+  <!-- Illustrated GIF library: batch 04 -->
   <script>
 (function () {
   'use strict';
@@ -1456,9 +1456,14 @@
   }
 
   // Only show an exercise-specific GIF if it has actually been produced.
-  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif"]);
+  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/goblet-squat.gif","female/pushup.gif","female/lat-pulldown.gif","female/leg-press.gif","female/curl-db.gif"]);
   function gifKey(name) {
     var n = foldName(name);
+    if (/^(curl halteres?|dumbbell curls?|curl biceps halteres?)$/.test(n)) return 'curl-db';
+    if (/^(leg press|presse a cuisses|presse a jambes)$/.test(n)) return 'leg-press';
+    if (/^(tirage vertical poulie haute|tirage vertical|lat pulldown)$/.test(n)) return 'lat-pulldown';
+    if (/^(pompes?|pompes? classiques?|push ups?|pushups?)$/.test(n)) return 'pushup';
+    if (/^(goblet squat|squat goblet|squat kettlebell)$/.test(n)) return 'goblet-squat';
     if (/^(rowing halteres? sur banc|rowing un bras sur banc|one arm dumbbell row|single arm dumbbell row|tirage halteres? sur banc)$/.test(n)) return 'row-db-bench';
     if (/^(fentes? arriere|reverse lunges?)$/.test(n)) return 'reverse-lunge';
     if (/^(developpe couche halteres?|dumbbell bench press|bench press halteres?)$/.test(n)) return 'bench-db';

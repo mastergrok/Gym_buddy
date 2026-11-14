@@ -1456,9 +1456,10 @@
   }
 
   // Only show an exercise-specific GIF if it has actually been produced.
-  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/goblet-squat.gif","female/pushup.gif","female/lat-pulldown.gif","female/leg-press.gif","female/curl-db.gif","female/curl-bar.gif","female/hammer-curl.gif","female/bulgarian-squat.gif","female/leg-extension.gif","female/cable-row.gif","female/triceps-pushdown.gif","female/incline-db.gif","female/leg-curl-prone.gif","female/calf-raise-standing.gif"]);
+  var GIF_ASSETS = new Set(["female/bench-bar.gif","female/pullup-pronation.gif","female/squat-bar.gif","female/lateral-raise.gif","male/bench-bar.gif","male/pullup-pronation.gif","male/lateral-raise.gif","female/ohp-db.gif","female/hip-thrust.gif","female/dips.gif","female/rdl.gif","female/bench-db.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/goblet-squat.gif","female/pushup.gif","female/lat-pulldown.gif","female/leg-press.gif","female/curl-db.gif","female/curl-bar.gif","female/hammer-curl.gif","female/bulgarian-squat.gif","female/leg-extension.gif","female/cable-row.gif","female/triceps-pushdown.gif","female/incline-db.gif","female/leg-curl-prone.gif","female/calf-raise-standing.gif","female/step-up.gif"]);
   function gifKey(name) {
     var n = foldName(name);
+    if (/^(step ups?|step ups? sur box|step up box|montees? sur box)$/.test(n)) return 'step-up';
     if (/^(mollets debout|standing calf raises?)$/.test(n)) return 'calf-raise-standing';
     if (/^(leg curl allonge|prone leg curls?|lying leg curls?)$/.test(n)) return 'leg-curl-prone';
     if (/^(developpe incline halteres?|incline dumbbell press|incline dumbbell bench press)$/.test(n)) return 'incline-db';

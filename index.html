@@ -2028,12 +2028,11 @@
   }
 
   function canSend(webApp) {
+    // A reply-keyboard web_app launch leaves initData empty, and that is the only
+    // launch where sendData works. Inline-button launches set initDataUnsafe.query_id.
     if (!webApp || typeof webApp.sendData !== 'function') return false;
     if (!webApp.platform || webApp.platform === 'unknown') return false;
-    if (typeof webApp.initData !== 'string' || !webApp.initData) return false;
-    // Inline-button launches carry query_id. sendData only works from a reply-keyboard web_app button.
-    var unsafe = webApp.initDataUnsafe;
-    if (unsafe && unsafe.query_id) return false;
+    if (webApp.initDataUnsafe && webApp.initDataUnsafe.query_id) return false;
     return true;
   }
 

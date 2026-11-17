@@ -640,6 +640,7 @@
   var restTotal = 0;
   var restIndex = -1;
   var restTick = 0;
+  var clockTick = 0;
   var hideTimer = 0;
   var editAt = null;
   var armClickSwallow = false;
@@ -1769,6 +1770,7 @@
   }
 
   function tickClock() {
+    if (sealed) return;
     var sec = Math.max(0, Math.floor((Date.now() - started) / 1000));
     if (sec === lastClock) return;
     lastClock = sec;
@@ -2029,34 +2031,86 @@
     if (!webApp || typeof webApp.sendData !== 'function') return false;
     if (!webApp.platform || webApp.platform === 'unknown') return false;
     if (typeof webApp.initData !== 'string' || !webApp.initData) return false;
+    // Inline-button launches carry query_id. sendData only works from a reply-keyboard web_app button.
+    var unsafe = webApp.initDataUnsafe;
+    if (unsafe && unsafe.query_id) return false;
     return true;
   }
 
-  function onFinish() {
-    if (lastJson) {
-      if (!canSend(tg)) showSummary(lastJson, lastShort);
-      return;
+  var confirming = false;
+
+  function askFinish(done) {
+    var message = 'Terminer la séance ?';
+    if (tg && typeof tg.showConfirm === 'function') {
+      try {
+        tg.showConfirm(message, function (ok) { done(!!ok); });
+        return;
+      } catch (e) {}
     }
-    var encoded = encodePayload(buildRaw());
-    lastJson = encoded.json;
-    lastShort = encoded.short;
+    done(!!window.confirm(message));
+  }
+
+  function stopSession() {
+    if (clockTick) {
+      clearInterval(clockTick);
+      clockTick = 0;
+    }
+    tickClock();
     sealed = true;
     restRunning = false;
     restUntil = 0;
     clearTimeout(hideTimer);
-    if (restTick) clearInterval(restTick);
+    if (restTick) {
+      clearInterval(restTick);
+      restTick = 0;
+    }
     storageDel(storageKey);
     hideRest();
-    if (canSend(tg)) {
-      try {
-        tg.sendData(lastJson);
-        return;
-      } catch (e) {
-        showSummary(lastJson, lastShort);
-        return;
-      }
+  }
+
+  function closeApp() {
+    if (tg && typeof tg.close === 'function') {
+      try { tg.close(); } catch (e) {}
     }
+  }
+
+  var summarySent = false;
+
+  function sendSummary(json) {
+    if (summarySent) {
+      closeApp();
+      return true;
+    }
+    if (!canSend(tg)) return false;
+    try {
+      tg.sendData(json);
+    } catch (e) {
+      return false;
+    }
+    summarySent = true;
+    closeApp();
+    return true;
+  }
+
+  function finishSession() {
+    if (!sealed) {
+      stopSession();
+      var encoded = encodePayload(buildRaw());
+      lastJson = encoded.json;
+      lastShort = encoded.short;
+    }
+    if (sendSummary(lastJson)) return;
     showSummary(lastJson, lastShort);
+  }
+
+  function onFinish() {
+    if (confirming) return;
+    confirming = true;
+    askFinish(function (ok) {
+      confirming = false;
+      if (!ok) return;
+      finishSession();
+    });
   }
 
   async function copySummary() {
@@ -2312,13 +2366,14 @@
   document.getElementById('rest-skip').addEventListener('click', skipRest);
   document.getElementById('summary-copy').addEventListener('click', function () { copySummary(); });
   document.getElementById('summary-close').addEventListener('click', function () {
+    closeApp();
     var dlg = document.getElementById('summary');
     if (typeof dlg.close === 'function' && dlg.open) dlg.close();
     else dlg.removeAttribute('open');
   });
 
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible' || sealed) return;
     tickClock();
     if (restRunning) tickRest();
   });
@@ -2335,7 +2390,7 @@
   syncAvatarButtons();
   renderAll();
   tickClock();
-  setInterval(tickClock, 250);
+  clockTick = setInterval(tickClock, 250);
   if (restRunning && !restTick) restTick = setInterval(tickRest, 200);
   save();
 

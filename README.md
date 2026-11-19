@@ -24,7 +24,7 @@ Open the URL above for the default session. Finished sets, edits and the running
 ```
 
 - `sets`, `reps` and `seconds` are exact numbers. Never send a range.
-- Use `reps` for repetitions. For a hold, omit `reps` and send `seconds` instead.
+- Use `reps` for repetitions. For a hold, omit `reps` and send `seconds` instead. A hold shows **⏱ Chrono**: a 3-2-1 get-ready (beep, and Telegram `HapticFeedback` when the Mini App provides it), then a countdown of that set’s seconds. At zero the set is ticked and the rest timer starts. Tapping the set still validates it directly, without waiting.
 - `weight` is optional. `unit` defaults to `kg` when `weight` is set (`kg par bras` is a valid unit).
 - `rest` is the rest after a completed set, in seconds.
 - The page does not add a warm-up block. Put only the work you want logged.

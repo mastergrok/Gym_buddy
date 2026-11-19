@@ -447,6 +447,83 @@
 
     #rest-skip { color: var(--destructive); }
 
+    body.hold-on { padding-bottom: calc(196px + env(safe-area-inset-bottom)); }
+
+    .set.timing {
+      border-color: var(--btn);
+      box-shadow: inset 0 0 0 2px var(--btn);
+    }
+
+    .hold-launch {
+      margin-top: 10px;
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: color-mix(in srgb, var(--btn) 22%, var(--secondary));
+      color: var(--text);
+      font-weight: 750;
+      font-size: 1rem;
+    }
+
+    .hold-launch:active { transform: scale(0.99); }
+
+    #hold-bar {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      z-index: 8;
+      background: var(--section);
+      color: var(--text);
+      border-radius: 18px;
+      border: 1px solid color-mix(in srgb, var(--btn) 65%, transparent);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+
+    #hold-bar[hidden] { display: none !important; }
+
+    #hold-progress { height: 4px; background: color-mix(in srgb, var(--text) 12%, transparent); }
+    #hold-progress-fill { display: block; height: 100%; width: 100%; background: var(--btn); }
+
+    .hold-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px 14px;
+    }
+
+    .hold-text { min-width: 0; flex: 1; }
+
+    #hold-label {
+      display: block;
+      color: var(--hint);
+      font-size: 0.82rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #hold-time {
+      display: block;
+      font-size: 4rem;
+      line-height: 0.95;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
+    }
+
+    #hold-cancel {
+      flex: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--bg);
+      color: var(--destructive);
+      font-weight: 700;
+    }
+
     #summary {
       width: min(520px, calc(100vw - 24px));
       max-height: min(90vh, 720px);
@@ -568,7 +645,7 @@
         <button type="button" class="avatar-btn" data-avatar="female" aria-pressed="false">Femme</button>
       </div>
     </header>
-    <p class="hint" id="hint">Touchez une série pour la valider. Maintenez ou touchez ✎ pour corriger.</p>
+    <p class="hint" id="hint">Touchez une série pour la valider. ⏱ lance le chrono d’un maintien. Maintenez ou touchez ✎ pour corriger.</p>
     <main id="exercise-list"></main>
     <footer>
       <button id="finish-btn" type="button">🏁 Terminer</button>
@@ -587,6 +664,17 @@
         <button type="button" id="rest-minus" aria-label="Retirer 15 secondes">−15 s</button>
         <button type="button" id="rest-skip">Passer</button>
       </div>
+    </div>
+  </div>
+
+  <div id="hold-bar" role="timer" aria-label="Chrono du maintien" hidden>
+    <div id="hold-progress" aria-hidden="true"><span id="hold-progress-fill"></span></div>
+    <div class="hold-inner">
+      <div class="hold-text">
+        <span id="hold-label">Prépare-toi</span>
+        <strong id="hold-time">3</strong>
+      </div>
+      <button type="button" id="hold-cancel">Annuler</button>
     </div>
   </div>
 
@@ -640,6 +728,8 @@
   var restTotal = 0;
   var restIndex = -1;
   var restTick = 0;
+  var hold = null;
+  var holdTick = 0;
   var clockTick = 0;
   var hideTimer = 0;
   var editAt = null;
@@ -863,6 +953,13 @@
       restTotal: restRunning ? restTotal : 0,
       restIndex: restRunning ? restIndex : -1,
       restRunning: !!restRunning,
+      hold: hold ? {
+        i: hold.i,
+        s: hold.s,
+        phase: hold.phase,
+        until: hold.until,
+        holdMs: hold.holdMs
+      } : null,
       cells: cells
     }));
   }
@@ -890,7 +987,45 @@
         restTotal = typeof data.restTotal === 'number' && data.restTotal > 0 ? data.restTotal : (data.restUntil - Date.now());
         restIndex = typeof data.restIndex === 'number' ? data.restIndex : -1;
       }
+      restoreHold(data.hold);
     } catch (e) {}
+  }
+
+  function restoreHold(saved) {
+    if (!saved || typeof saved !== 'object') return;
+    var i = saved.i;
+    var s = saved.s;
+    var ex = programme.exercises[i];
+    if (!ex || ex.seconds == null || !cells[i] || !cells[i][s] || cells[i][s].done) return;
+    var holdMs = Number(saved.holdMs);
+    if (!isFinite(holdMs) || holdMs <= 0) return;
+    var phase = saved.phase === 'hold' ? 'hold' : 'ready';
+    var until = Number(saved.until);
+    if (!isFinite(until)) return;
+    if (phase === 'ready') {
+      if (until <= Date.now()) {
+        var late = Date.now() - until;
+        if (late >= holdMs) {
+          hold = null;
+          if (!sealed) toggleSet(i, s);
+          return;
+        }
+        phase = 'hold';
+        until = Date.now() + (holdMs - late);
+      }
+    } else if (until <= Date.now()) {
+      hold = null;
+      if (!sealed) toggleSet(i, s);
+      return;
+    }
+    hold = {
+      i: i,
+      s: s,
+      phase: phase,
+      until: until,
+      holdMs: holdMs,
+      shown: Math.ceil(Math.max(0, until - Date.now()) / 1000)
+    };
   }
 
   function sanitizeCell(cell, ex) {
@@ -1457,9 +1592,71 @@
   }
 
   // Only show an exercise-specific GIF if it has actually been produced.
-  var GIF_ASSETS = new Set(["female/abductor-machine.gif","female/active-hang.gif","female/adductor-machine.gif","female/barbell-row.gif","female/bench-bar.gif","female/bench-db.gif","female/bulgarian-squat.gif","female/cable-fly.gif","female/cable-row.gif","female/calf-raise-machine.gif","female/calf-raise-standing.gif","female/chin-up.gif","female/crunch.gif","female/curl-bar.gif","female/curl-db.gif","female/deadlift.gif","female/dips.gif","female/dumbbell-pullover.gif","female/face-pull.gif","female/front-raise.gif","female/front-squat.gif","female/glute-bridge.gif","female/goblet-squat.gif","female/hammer-curl.gif","female/handstand-free.gif","female/handstand-wall-back.gif","female/hip-thrust.gif","female/hollow-hold.gif","female/incline-db.gif","female/l-sit.gif","female/lat-pulldown.gif","female/lateral-raise.gif","female/leg-curl-prone.gif","female/leg-extension.gif","female/leg-press.gif","female/ohp-bar.gif","female/ohp-db.gif","female/overhead-triceps-extension.gif","female/pec-deck.gif","female/pike-pushup.gif","female/plank.gif","female/preacher-curl.gif","female/press-handstand.gif","female/pullup-pronation.gif","female/pushup.gif","female/rdl.gif","female/reverse-fly.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/shrug.gif","female/squat-bar.gif","female/step-up.gif","female/triceps-pushdown.gif","female/wall-walk.gif","male/abductor-machine.gif","male/active-hang.gif","male/adductor-machine.gif","male/barbell-row.gif","male/bench-bar.gif","male/bench-db.gif","male/bulgarian-squat.gif","male/cable-fly.gif","male/cable-row.gif","male/calf-raise-machine.gif","male/calf-raise-standing.gif","male/chin-up.gif","male/crunch.gif","male/curl-bar.gif","male/curl-db.gif","male/deadlift.gif","male/dips.gif","male/dumbbell-pullover.gif","male/face-pull.gif","male/front-raise.gif","male/front-squat.gif","male/glute-bridge.gif","male/goblet-squat.gif","male/hammer-curl.gif","male/handstand-free.gif","male/handstand-wall-back.gif","male/hip-thrust.gif","male/hollow-hold.gif","male/incline-db.gif","male/l-sit.gif","male/lat-pulldown.gif","male/lateral-raise.gif","male/leg-curl-prone.gif","male/leg-extension.gif","male/leg-press.gif","male/ohp-bar.gif","male/ohp-db.gif","male/overhead-triceps-extension.gif","male/pec-deck.gif","male/pike-pushup.gif","male/plank.gif","male/preacher-curl.gif","male/press-handstand.gif","male/pullup-pronation.gif","male/pushup.gif","male/rdl.gif","male/reverse-fly.gif","male/reverse-lunge.gif","male/row-db-bench.gif","male/shrug.gif","male/squat-bar.gif","male/step-up.gif","male/triceps-pushdown.gif","male/wall-walk.gif"]);
+  var GIF_ASSETS = new Set(["female/ab-wheel.gif","female/abductor-machine.gif","female/active-hang.gif","female/adductor-machine.gif","female/back-lever.gif","female/barbell-row.gif","female/battle-ropes.gif","female/bench-bar.gif","female/bench-db.gif","female/bike.gif","female/box-jump.gif","female/bulgarian-squat.gif","female/burpee.gif","female/cable-crunch.gif","female/cable-fly.gif","female/cable-row.gif","female/calf-raise-machine.gif","female/calf-raise-seated.gif","female/calf-raise-standing.gif","female/chest-press.gif","female/chin-up.gif","female/crunch.gif","female/curl-bar.gif","female/curl-db.gif","female/curl-incline.gif","female/dead-bug.gif","female/deadlift.gif","female/decline-pushup.gif","female/dips.gif","female/dragon-flag.gif","female/dumbbell-pullover.gif","female/face-pull.gif","female/farmer-walk.gif","female/front-lever.gif","female/front-raise.gif","female/front-squat.gif","female/glute-bridge.gif","female/goblet-squat.gif","female/good-morning.gif","female/hack-squat.gif","female/hammer-curl.gif","female/handstand-exit.gif","female/handstand-free.gif","female/handstand-pushup.gif","female/handstand-wall-back.gif","female/handstand-wall-front.gif","female/hanging-leg-raise.gif","female/hip-thrust.gif","female/hollow-hold.gif","female/incline-db.gif","female/jump-rope.gif","female/kettlebell-swing.gif","female/l-sit.gif","female/lat-pulldown.gif","female/lateral-raise.gif","female/leg-curl-prone.gif","female/leg-curl-seated.gif","female/leg-extension.gif","female/leg-press.gif","female/muscle-up.gif","female/nordic-curl.gif","female/ohp-bar.gif","female/ohp-db.gif","female/overhead-triceps-extension.gif","female/pallof-press.gif","female/pec-deck.gif","female/pike-pushup.gif","female/pistol-squat.gif","female/plank.gif","female/preacher-curl.gif","female/press-handstand.gif","female/pullover-cable.gif","female/pullup-pronation.gif","female/pushup.gif","female/rdl.gif","female/reverse-fly.gif","female/reverse-lunge.gif","female/row-db-bench.gif","female/rower.gif","female/run.gif","female/shrug.gif","female/side-plank.gif","female/ski-erg.gif","female/skin-the-cat.gif","female/skullcrusher.gif","female/sled-push.gif","female/squat-bar.gif","female/step-up.gif","female/straddle-planche.gif","female/suitcase-carry.gif","female/support-hold.gif","female/tbar-row.gif","female/toes-to-bar.gif","female/triceps-pushdown.gif","female/tuck-planche.gif","female/v-sit.gif","female/wall-walk.gif","male/ab-wheel.gif","male/abductor-machine.gif","male/active-hang.gif","male/adductor-machine.gif","male/back-lever.gif","male/barbell-row.gif","male/battle-ropes.gif","male/bench-bar.gif","male/bench-db.gif","male/bike.gif","male/box-jump.gif","male/bulgarian-squat.gif","male/burpee.gif","male/cable-crunch.gif","male/cable-fly.gif","male/cable-row.gif","male/calf-raise-machine.gif","male/calf-raise-seated.gif","male/calf-raise-standing.gif","male/chest-press.gif","male/chin-up.gif","male/crunch.gif","male/curl-bar.gif","male/curl-db.gif","male/curl-incline.gif","male/dead-bug.gif","male/deadlift.gif","male/decline-pushup.gif","male/dips.gif","male/dragon-flag.gif","male/dumbbell-pullover.gif","male/face-pull.gif","male/farmer-walk.gif","male/front-lever.gif","male/front-raise.gif","male/front-squat.gif","male/glute-bridge.gif","male/goblet-squat.gif","male/good-morning.gif","male/hack-squat.gif","male/hammer-curl.gif","male/handstand-exit.gif","male/handstand-free.gif","male/handstand-pushup.gif","male/handstand-wall-back.gif","male/handstand-wall-front.gif","male/hanging-leg-raise.gif","male/hip-thrust.gif","male/hollow-hold.gif","male/incline-db.gif","male/jump-rope.gif","male/kettlebell-swing.gif","male/l-sit.gif","male/lat-pulldown.gif","male/lateral-raise.gif","male/leg-curl-prone.gif","male/leg-curl-seated.gif","male/leg-extension.gif","male/leg-press.gif","male/muscle-up.gif","male/nordic-curl.gif","male/ohp-bar.gif","male/ohp-db.gif","male/overhead-triceps-extension.gif","male/pallof-press.gif","male/pec-deck.gif","male/pike-pushup.gif","male/pistol-squat.gif","male/plank.gif","male/preacher-curl.gif","male/press-handstand.gif","male/pullover-cable.gif","male/pullup-pronation.gif","male/pushup.gif","male/rdl.gif","male/reverse-fly.gif","male/reverse-lunge.gif","male/row-db-bench.gif","male/rower.gif","male/run.gif","male/shrug.gif","male/side-plank.gif","male/ski-erg.gif","male/skin-the-cat.gif","male/skullcrusher.gif","male/sled-push.gif","male/squat-bar.gif","male/step-up.gif","male/straddle-planche.gif","male/suitcase-carry.gif","male/support-hold.gif","male/tbar-row.gif","male/toes-to-bar.gif","male/triceps-pushdown.gif","male/tuck-planche.gif","male/v-sit.gif","male/wall-walk.gif"]);
+  var GIF_ALIASES = {
+    'tractions prise neutre': 'pullup-pronation',
+    'tractions lestees': 'pullup-pronation',
+    'muscle up': 'muscle-up',
+    'rowing halteres': 'row-db-bench',
+    'rowing t bar': 'tbar-row',
+    'rowing machine convergente': 'cable-row',
+    'pull over poulie': 'pullover-cable',
+    'curl incline': 'curl-incline',
+    'developpe incline barre': 'incline-db',
+    'push press': 'ohp-bar',
+    'chest press machine': 'chest-press',
+    'dips lestes': 'dips',
+    'pompes diamant': 'pushup',
+    'pompes declinees': 'decline-pushup',
+    'pompes en atr': 'handstand-pushup',
+    'elevations laterales poulie': 'lateral-raise',
+    'reverse pec deck': 'reverse-fly',
+    'barre au front': 'skullcrusher',
+    'fentes marchees': 'reverse-lunge',
+    'good morning': 'good-morning',
+    'hack squat': 'hack-squat',
+    'leg curl assis': 'leg-curl-seated',
+    'nordic curl': 'nordic-curl',
+    'mollets assis': 'calf-raise-seated',
+    'pistol squat': 'pistol-squat',
+    'atr ventre au mur': 'handstand-wall-front',
+    'sorties controlees': 'handstand-exit',
+    'v sit': 'v-sit',
+    'tuck planche': 'tuck-planche',
+    'straddle planche': 'straddle-planche',
+    'front lever tuck': 'front-lever',
+    'back lever tuck': 'back-lever',
+    'support sur barres paralleles': 'support-hold',
+    'skin the cat': 'skin-the-cat',
+    'dragon flag': 'dragon-flag',
+    'planche laterale': 'side-plank',
+    'dead bug': 'dead-bug',
+    'crunch poulie a genoux': 'cable-crunch',
+    'releves de jambes suspendu': 'hanging-leg-raise',
+    'toes to bar': 'toes-to-bar',
+    'pallof press': 'pallof-press',
+    'ab wheel': 'ab-wheel',
+    'farmer walk': 'farmer-walk',
+    'suitcase carry': 'suitcase-carry',
+    'kettlebell swing': 'kettlebell-swing',
+    'box jump': 'box-jump',
+    'burpees': 'burpee',
+    'corde a sauter': 'jump-rope',
+    'battle ropes': 'battle-ropes',
+    'sled push': 'sled-push',
+    'rameur': 'rower',
+    'velo': 'bike',
+    'velo a bras': 'bike',
+    'assault bike': 'bike',
+    'course': 'run',
+    'sprints': 'run',
+    'ski erg': 'ski-erg',
+    'developpe militaire halteres assis': 'ohp-db'
+  };
+
   function gifKey(name) {
     var n = foldName(name);
+    if (GIF_ALIASES[n]) return GIF_ALIASES[n];
     if (/^(tractions? supination|tractions? en supination|chin ups?|chinups?)$/.test(n)) return 'chin-up';
     if (/^(face pulls?|face pulls? poulie|tirage visage)$/.test(n)) return 'face-pull';
     if (/^(shrugs?( halteres?)?|dumbbell shrugs?|haussements? d epaules( halteres?)?)$/.test(n)) return 'shrug';
@@ -1498,7 +1695,7 @@
     if (/^(dips|parallel bar dips|bar dips)$/.test(n)) return 'dips';
     if (/^(developpe couche barre|barbell bench press|bench press barre|developpe couche)$/.test(n)) return 'bench-bar';
     if (/^(tractions? pronation|pull ups?|pullups?|tractions?)$/.test(n)) return 'pullup-pronation';
-    if (/^(developpe militaire halteres?|dumbbell overhead press|dumbbell shoulder press|developpe epaules? halteres?)$/.test(n)) return 'ohp-db';
+    if (/^(developpe militaire halteres?|dumbbell overhead press|dumbbell shoulder press|developpe epaules? halteres?)( [a-z0-9]+)*$/.test(n) && !/\bbarre\b|barbell/.test(n)) return 'ohp-db';
     if (/^(hip thrust|hip thrust barre|barbell hip thrust)$/.test(n)) return 'hip-thrust';
     if (/^(squat barre|barbell back squat|back squat)$/.test(n)) return 'squat-bar';
     if (/^(elevations? laterales? halteres?|dumbbell lateral raises?|elevations? laterales?)$/.test(n)) return 'lateral-raise';
@@ -1506,7 +1703,7 @@
     if (/press (to |en |vers )?(atr|handstand|poirier)|press atr|press handstand|monte(e)? en press/.test(n)) return 'press-handstand';
     if (/scapul|suspension active|hang actif|active hang|dead hang|suspension (a la |barre|passive)|^suspension$/.test(n) && !/jambes?|genoux|knee|leg|relev/.test(n)) return 'active-hang';
     if (/montees? (des )?pieds au mur|pieds au mur|wall walks?|marche au mur/.test(n)) return 'wall-walk';
-    if (/ventre au mur|face au mur|chest to wall|belly to wall/.test(n)) return '';
+    if (/ventre au mur|face au mur|chest to wall|belly to wall/.test(n)) return 'handstand-wall-front';
     if (/dos au mur|back to wall|(atr|poirier|handstand) (contre le |au )?mur|wall handstand/.test(n)) return 'handstand-wall-back';
     if (/\batr\b|poirier|handstand|appui tendu renverse/.test(n)) return 'handstand-free';
     if (/\bl ?sit\b|equerre/.test(n)) return 'l-sit';
@@ -1522,12 +1719,13 @@
     var key = gifKey(name), file = avatarGender + '/' + key + '.gif';
     if (!key || !GIF_ASSETS.has(file)) return '<span class="gif-pending">GIF à venir</span>';
     if (prefersStill()) return '<span class="gif-pending">Animation désactivée</span>';
-    return '<img class="exercise-gif" src="./assets/exercises/' + file + '?v=archive-20261115" alt="" decoding="async">';
+    return '<img class="exercise-gif" src="./assets/exercises/' + file + '?v=20261119" alt="" decoding="async">';
   }
   function renderAll() {
     renderHeader();
     renderExercises();
     renderRest();
+    renderHold();
   }
 
   function renderHeader() {
@@ -1592,6 +1790,8 @@
       for (var s = 0; s < ex.sets; s++) sets.append(renderSet(ex, i, s));
 
       card.append(head, target, rest, sets);
+      var launch = renderHoldLaunch(ex, i);
+      if (launch) card.append(launch);
       if (editAt && editAt.i === i) card.append(renderEditor(ex, editAt.s));
       list.append(card);
     });
@@ -1616,6 +1816,7 @@
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'set';
+    if (hold && hold.i === i && hold.s === s) btn.classList.add('timing');
     btn.dataset.i = String(i);
     btn.dataset.s = String(s);
     btn.setAttribute('aria-pressed', cell.done ? 'true' : 'false');
@@ -1714,6 +1915,36 @@
 
     box.append(title, fields, err, actions);
     return box;
+  }
+
+  function nextUndone(i) {
+    var row = cells[i] || [];
+    for (var s = 0; s < row.length; s++) {
+      if (!row[s].done) return s;
+    }
+    return -1;
+  }
+
+  function renderHoldLaunch(ex, i) {
+    if (ex.seconds == null) return null;
+    var running = hold && hold.i === i;
+    var s = running ? hold.s : nextUndone(i);
+    if (s < 0) return null;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hold-launch';
+    btn.dataset.i = String(i);
+    btn.dataset.s = String(s);
+    if (running) {
+      btn.dataset.hold = 'cancel';
+      btn.textContent = 'Annuler le chrono';
+      btn.setAttribute('aria-label', 'Annuler le chrono de ' + ex.name);
+    } else {
+      var secs = cells[i][s].seconds != null ? cells[i][s].seconds : ex.seconds;
+      btn.textContent = '⏱ Chrono · série ' + (s + 1) + ' · ' + fmtNum(secs) + ' s';
+      btn.setAttribute('aria-label', 'Lancer le chrono de la série ' + (s + 1) + ' de ' + ex.name + ', ' + fmtNum(secs) + ' secondes');
+    }
+    return btn;
   }
 
   function exIndex(ex) {
@@ -1859,9 +2090,143 @@
     syncRestingClass();
   }
 
+  function hideHold() {
+    var bar = document.getElementById('hold-bar');
+    if (bar) bar.hidden = true;
+    document.body.classList.remove('hold-on');
+  }
+
+  function fmtHold(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    if (s >= 60) {
+      var m = Math.floor(s / 60);
+      return m + ':' + String(s % 60).padStart(2, '0');
+    }
+    return String(s);
+  }
+
+  function holdSeconds(i, s) {
+    var ex = programme.exercises[i];
+    var cell = cells[i] && cells[i][s];
+    var n = cell && cell.seconds != null ? Number(cell.seconds) : Number(ex && ex.seconds);
+    if (!isFinite(n) || n < 0) return 0;
+    return n;
+  }
+
+  function clearHoldTimer() {
+    hold = null;
+    if (holdTick) {
+      clearInterval(holdTick);
+      holdTick = 0;
+    }
+    hideHold();
+  }
+
+  function renderHold() {
+    var bar = document.getElementById('hold-bar');
+    if (!hold) {
+      hideHold();
+      return;
+    }
+    bar.hidden = false;
+    document.body.classList.add('hold-on');
+    var ex = programme.exercises[hold.i];
+    var name = ex ? ex.name : 'Maintien';
+    var left = Math.max(0, hold.until - Date.now());
+    var label = hold.phase === 'ready' ? 'Prépare-toi' : 'Maintiens';
+    document.getElementById('hold-label').textContent = label + ' · ' + name + ' · série ' + (hold.s + 1);
+    document.getElementById('hold-time').textContent = fmtHold(left);
+    var total = hold.phase === 'ready' ? 3000 : (hold.holdMs || left || 1);
+    var pct = Math.max(0, Math.min(100, (left / total) * 100));
+    document.getElementById('hold-progress-fill').style.width = pct + '%';
+  }
+
+  function startHold(i, s) {
+    if (sealed) return;
+    var ex = programme.exercises[i];
+    if (!ex || ex.seconds == null || !cells[i] || !cells[i][s] || cells[i][s].done) return;
+    primeAudio();
+    if (hold && hold.i === i && hold.s === s) {
+      clearHoldTimer();
+      save();
+      renderExercises();
+      return;
+    }
+    var holdMs = Math.round(holdSeconds(i, s) * 1000);
+    if (holdMs < 400) {
+      clearHoldTimer();
+      if (!cells[i][s].done) toggleSet(i, s);
+      return;
+    }
+    if (restRunning) skipRest();
+    hold = {
+      i: i,
+      s: s,
+      phase: 'ready',
+      until: Date.now() + 3000,
+      holdMs: holdMs,
+      shown: 3
+    };
+    hapticImpact('medium');
+    blip(740);
+    save();
+    renderHold();
+    renderExercises();
+    announce('Prépare-toi, ' + ex.name);
+    if (!holdTick) holdTick = setInterval(tickHold, 80);
+  }
+
+  function beginHoldPhase() {
+    if (!hold || hold.phase !== 'ready') return;
+    hold.phase = 'hold';
+    hold.until = Date.now() + hold.holdMs;
+    hold.shown = Math.ceil(hold.holdMs / 1000);
+    hapticImpact('heavy');
+    blip(880);
+    save();
+    renderHold();
+    var ex = programme.exercises[hold.i];
+    announce('Maintiens' + (ex ? ', ' + ex.name : ''));
+  }
+
+  function completeHold() {
+    if (!hold) return;
+    var i = hold.i;
+    var s = hold.s;
+    clearHoldTimer();
+    hapticSuccess();
+    beep();
+    announce('Maintien terminé');
+    if (!sealed && cells[i] && cells[i][s] && !cells[i][s].done) toggleSet(i, s);
+    else {
+      save();
+      renderExercises();
+    }
+  }
+
+  function tickHold() {
+    if (!hold) return;
+    var left = hold.until - Date.now();
+    if (left <= 0) {
+      if (hold.phase === 'ready') beginHoldPhase();
+      else completeHold();
+      return;
+    }
+    var sec = Math.ceil(left / 1000);
+    if (hold.phase === 'ready' && sec !== hold.shown) {
+      hold.shown = sec;
+      hapticImpact('light');
+      blip(740);
+    } else {
+      hold.shown = sec;
+    }
+    renderHold();
+  }
+
   function toggleSet(i, s) {
     if (sealed) return;
     if (!cells[i] || !cells[i][s]) return;
+    if (hold && hold.i === i && hold.s === s) clearHoldTimer();
     var cell = cells[i][s];
     var was = cell.done;
     cell.done = !cell.done;
@@ -2064,6 +2429,7 @@
       restTick = 0;
     }
     storageDel(storageKey);
+    clearHoldTimer();
     hideRest();
   }
 
@@ -2138,6 +2504,16 @@
     }
   }
 
+  function hapticImpact(style) {
+    var h = tg && tg.HapticFeedback;
+    if (h && typeof h.impactOccurred === 'function') {
+      try { h.impactOccurred(style || 'medium'); return; } catch (e) {}
+    }
+    try {
+      if (navigator.vibrate) navigator.vibrate(style === 'heavy' ? 35 : 15);
+    } catch (e) {}
+  }
+
   function hapticSuccess() {
     var h = tg && tg.HapticFeedback;
     if (!h) return;
@@ -2153,6 +2529,23 @@
       if (!AC) return;
       if (!audioCtx) audioCtx = new AC();
       if (audioCtx.state === 'suspended' && audioCtx.resume) audioCtx.resume();
+    } catch (e) {}
+  }
+
+  function blip(freq) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      var ctx = audioCtx;
+      var play = function () { tone(ctx, freq || 740, 0, 0.09); };
+      if (ctx.state === 'suspended' && ctx.resume) {
+        var pending = ctx.resume();
+        if (pending && typeof pending.then === 'function') pending.then(play).catch(function () {});
+        else play();
+      } else {
+        play();
+      }
     } catch (e) {}
   }
 
@@ -2290,6 +2683,16 @@
   }, true);
 
   list.addEventListener('click', function (e) {
+    var launchBtn = e.target.closest('.hold-launch');
+    if (launchBtn) {
+      if (launchBtn.dataset.hold === 'cancel') clearHoldTimer();
+      else startHold(Number(launchBtn.dataset.i), Number(launchBtn.dataset.s));
+      if (launchBtn.dataset.hold === 'cancel') {
+        save();
+        renderExercises();
+      }
+      return;
+    }
     var previewBtn = e.target.closest('.ex-anim');
     if (previewBtn) {
       var previewDialog = document.getElementById('avatar-preview');
@@ -2363,6 +2766,12 @@
   document.getElementById('rest-plus').addEventListener('click', function () { adjustRest(15000); });
   document.getElementById('rest-minus').addEventListener('click', function () { adjustRest(-15000); });
   document.getElementById('rest-skip').addEventListener('click', skipRest);
+  document.getElementById('hold-cancel').addEventListener('click', function () {
+    if (!hold) return;
+    clearHoldTimer();
+    save();
+    renderExercises();
+  });
   document.getElementById('summary-copy').addEventListener('click', function () { copySummary(); });
   document.getElementById('summary-close').addEventListener('click', function () {
     closeApp();
@@ -2375,6 +2784,7 @@
     if (document.visibilityState !== 'visible' || sealed) return;
     tickClock();
     if (restRunning) tickRest();
+    if (hold) tickHold();
   });
 
 
@@ -2391,6 +2801,10 @@
   tickClock();
   clockTick = setInterval(tickClock, 250);
   if (restRunning && !restTick) restTick = setInterval(tickRest, 200);
+  if (hold) {
+    renderHold();
+    if (!holdTick) holdTick = setInterval(tickHold, 80);
+  }
   save();
 
   if (tg) {

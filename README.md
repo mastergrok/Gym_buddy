@@ -6,7 +6,7 @@ Telegram Mini App for logging a gym session. It is a single static page (no buil
 
 GitHub Pages uses the repository name as written (`Gym_buddy`). The lowercase path `https://mastergrok.github.io/gym_buddy/` is not served.
 
-Open the URL above for the default session. Finished sets, edits and the running rest timer are stored in `localStorage`, keyed by the programme, so closing the page does not drop progress. **Terminer** clears that saved state.
+Open the URL above for the default session. Finished sets, edits and the running rest timer are stored in `localStorage`, keyed by the programme, so closing the page does not drop progress. **Terminer** stops the clock, clears that saved state, and opens the end screen. **Envoyer** sends the session.
 
 ## Programme query param `p`
 
@@ -87,6 +87,7 @@ The bot then receives `message.web_app_data.data`: a JSON string of at most 4096
   "title": "Séance",
   "started": "2026-11-12T11:00:00.000Z",
   "duration_s": 1234,
+  "comment": "Facile, sauf les dips. Série 3 sautée, épaule fatiguée.",
   "exercises": [{
     "name": "Développé couché barre",
     "target": "4 × 10 · 60 kg",
@@ -95,4 +96,6 @@ The bot then receives `message.web_app_data.data`: a JSON string of at most 4096
 }
 ```
 
-Holds use `seconds` instead of `reps`. `weight` is omitted when the set has none. If that object would exceed 4096 bytes, keys are shortened (`t`, `n`, `s`, `d`, `e`, and per set `ok`, `r` or `sec`, `w`), then targets (`g`) are dropped, then sets are removed from the end until it fits.
+`comment` is the optional note from the end screen (ease, shape, fatigue, skipped sets and why). It is always present and may be `""`.
+
+Holds use `seconds` instead of `reps`. `weight` is omitted when the set has none. If that object would exceed 4096 bytes, keys are shortened (`t`, `n`, `s`, `d`, `e`, and per set `ok`, `r` or `sec`, `w`), then targets (`g`) are dropped, then sets are removed from the end until it fits. `comment` keeps its name. A comment that would push the payload past 4096 bytes is cut from the end until it fits; sets are dropped only after that comment is empty.

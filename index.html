@@ -40,14 +40,14 @@
 
     body.rest-on { padding-bottom: calc(148px + env(safe-area-inset-bottom)); }
 
-    button, input { font: inherit; color: inherit; }
+    button, input, textarea { font: inherit; color: inherit; }
 
     button {
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
 
-    button:focus-visible, input:focus-visible {
+    button:focus-visible, input:focus-visible, textarea:focus-visible {
       outline: 2px solid var(--btn);
       outline-offset: 2px;
     }
@@ -387,6 +387,88 @@
 
     #finish-btn:active { transform: scale(0.99); }
 
+    #end-screen {
+      padding: 4px 16px calc(24px + env(safe-area-inset-bottom));
+    }
+
+    #end-screen[hidden] { display: none !important; }
+
+    #end-title {
+      margin: 8px 0 6px;
+      font-size: 1.2rem;
+    }
+
+    #end-title:focus { outline: none; }
+
+    #end-lead {
+      margin: 0 0 14px;
+      color: var(--hint);
+      font-size: 0.92rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .comment-field {
+      display: grid;
+      gap: 6px;
+      font-size: 0.92rem;
+      font-weight: 650;
+    }
+
+    .comment-field > span {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .comment-optional {
+      font-style: normal;
+      font-weight: 500;
+      color: var(--hint);
+      font-size: 0.82rem;
+    }
+
+    #session-comment {
+      width: 100%;
+      min-height: 132px;
+      resize: vertical;
+      font-size: 16px;
+      line-height: 1.4;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+      background: var(--section);
+      color: var(--text);
+    }
+
+    #session-comment::placeholder { color: var(--hint); }
+
+    #end-help {
+      margin: 8px 0 0;
+      color: var(--hint);
+      font-size: 0.85rem;
+    }
+
+    #send-session {
+      width: 100%;
+      margin-top: 14px;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: var(--btn);
+      color: var(--btn-text);
+      font-weight: 700;
+      font-size: 1.05rem;
+      scroll-margin-bottom: 160px;
+    }
+
+    #send-session:active { transform: scale(0.99); }
+
+    body.session-ended #hint,
+    body.session-ended #exercise-list,
+    body.session-ended footer,
+    body.session-ended #avatar-picker { display: none; }
+
     #rest-bar {
       position: fixed;
       left: 0;
@@ -650,6 +732,16 @@
     <footer>
       <button id="finish-btn" type="button">🏁 Terminer</button>
     </footer>
+    <section id="end-screen" hidden aria-labelledby="end-title">
+      <h2 id="end-title" tabindex="-1">Séance terminée</h2>
+      <p id="end-lead"></p>
+      <label class="comment-field">
+        <span>Commentaire <em class="comment-optional">optionnel</em></span>
+        <textarea id="session-comment" rows="5" maxlength="2000" autocomplete="off" aria-describedby="end-help" placeholder="Ton ressenti…"></textarea>
+      </label>
+      <p id="end-help">Facilité, forme, fatigue, séries sautées et pourquoi.</p>
+      <button id="send-session" type="button">Envoyer</button>
+    </section>
   </div>
 
   <div id="rest-bar" role="region" aria-label="Repos" hidden>
@@ -736,6 +828,7 @@
   var armClickSwallow = false;
   var swallowClick = false;
   var sealed = false;
+  var endedAt = 0;
   var lastJson = null;
   var lastShort = false;
   var audioCtx = null;
@@ -2288,12 +2381,20 @@
     return unescape(encodeURIComponent(s)).length;
   }
 
+  function sessionComment() {
+    var el = document.getElementById('session-comment');
+    if (!el) return '';
+    return String(el.value || '').trim();
+  }
+
   function buildRaw() {
+    var end = sealed && endedAt ? endedAt : Date.now();
     return {
       type: 'gym_session',
       title: programme.title,
       started: new Date(started).toISOString(),
-      duration_s: Math.max(0, Math.round((Date.now() - started) / 1000)),
+      duration_s: Math.max(0, Math.round((end - started) / 1000)),
+      comment: sessionComment(),
       exercises: programme.exercises.map(function (ex, i) {
         return {
           name: ex.name,
@@ -2324,6 +2425,7 @@
       n: raw.title,
       s: raw.started,
       d: raw.duration_s,
+      comment: raw.comment || '',
       e: raw.exercises.map(function (ex) {
         var item = { n: ex.name };
         if (withTarget) item.g = ex.target;
@@ -2333,8 +2435,33 @@
     };
   }
 
+  function clipComment(text, maxChars) {
+    var s = String(text || '');
+    if (s.length <= maxChars) return s;
+    return s.slice(0, maxChars).replace(/[\uD800-\uDBFF]$/, '');
+  }
+
   function fitShort(raw) {
     var clone = JSON.parse(JSON.stringify(raw));
+    if (clone.comment) {
+      var lo = 0;
+      var hi = clone.comment.length;
+      var best = 0;
+      while (lo <= hi) {
+        var mid = Math.floor((lo + hi) / 2);
+        clone.comment = clipComment(raw.comment, mid);
+        if (utf8len(JSON.stringify(toShort(clone, false))) <= 4096) {
+          best = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      clone.comment = clipComment(raw.comment, best);
+      var trimmed = JSON.stringify(toShort(clone, false));
+      if (utf8len(trimmed) <= 4096) return trimmed;
+      clone.comment = '';
+    }
     var guard = 0;
     function packed() { return JSON.stringify(toShort(clone, false)); }
     while (utf8len(packed()) > 4096 && guard < 10000) {
@@ -2421,6 +2548,7 @@
     }
     tickClock();
     sealed = true;
+    endedAt = Date.now();
     restRunning = false;
     restUntil = 0;
     clearTimeout(hideTimer);
@@ -2457,24 +2585,42 @@
     return true;
   }
 
-  function finishSession() {
-    if (!sealed) {
-      stopSession();
-      var encoded = encodePayload(buildRaw());
-      lastJson = encoded.json;
-      lastShort = encoded.short;
+  function showEndScreen() {
+    var c = counts();
+    var sec = Math.max(0, Math.floor((endedAt - started) / 1000));
+    document.getElementById('end-lead').textContent =
+      c.done + ' / ' + c.total + ' ' + seriesWord(c.total) + ' · ' + fmtClock(sec);
+    document.body.classList.add('session-ended');
+    document.getElementById('end-screen').hidden = false;
+    setMainButton('Envoyer');
+    try { document.getElementById('end-title').focus(); } catch (e) {}
+  }
+
+  function submitSession() {
+    if (summarySent) {
+      closeApp();
+      return;
     }
+    if (!sealed) stopSession();
+    var encoded = encodePayload(buildRaw());
+    lastJson = encoded.json;
+    lastShort = encoded.short;
     if (sendSummary(lastJson)) return;
     showSummary(lastJson, lastShort);
   }
 
   function onFinish() {
     if (confirming) return;
+    if (sealed) {
+      submitSession();
+      return;
+    }
     confirming = true;
     askFinish(function (ok) {
       confirming = false;
       if (!ok) return;
-      finishSession();
+      stopSession();
+      showEndScreen();
     });
   }
 
@@ -2634,6 +2780,20 @@
     }
   }
 
+  function setMainButton(text) {
+    var mb = tg && tg.MainButton;
+    if (!mb) return;
+    try {
+      if (typeof mb.setText === 'function') mb.setText(text);
+      else mb.text = text;
+    } catch (e) {}
+    try {
+      if (pColor(tg) && typeof mb.setParams === 'function') {
+        mb.setParams({ text: text, is_visible: true });
+      }
+    } catch (e) {}
+  }
+
   function setupMainButton(webApp) {
     var mb = webApp && webApp.MainButton;
     if (!mb) return;
@@ -2763,6 +2923,7 @@
     else dlg.removeAttribute('open');
   });
   finishBtn.addEventListener('click', onFinish);
+  document.getElementById('send-session').addEventListener('click', submitSession);
   document.getElementById('rest-plus').addEventListener('click', function () { adjustRest(15000); });
   document.getElementById('rest-minus').addEventListener('click', function () { adjustRest(-15000); });
   document.getElementById('rest-skip').addEventListener('click', skipRest);

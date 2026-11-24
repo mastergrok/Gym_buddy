@@ -1499,7 +1499,7 @@
     }));
   }
 
-  function legcurl() {
+  function legcurlProne() {
     var dur = '1.9s';
     return svg(floor(66) + bench(14, 40, 64) + person({
       x: 42, y: 38, dur: dur, torso: -90,
@@ -1507,6 +1507,33 @@
       legs: [{
         a: -90, k: 0, thigh: 15, shin: 14, footLen: 6,
         kAnim: '0;-108;0'
+      }]
+    }));
+  }
+
+  function legcurl() {
+    // Seated leg curl: thigh pad stays on the thighs, the ankle roller
+    // travels with the shin as it curls down and back under the seat.
+    var dur = '1.9s';
+    var machine = '<g class="gear">' +
+      '<line x1="20" y1="24" x2="20" y2="66"/>' +
+      '<line x1="16" y1="24" x2="28" y2="24"/>' +
+      '<line x1="20" y1="50" x2="54" y2="50"/>' +
+      '<line x1="36" y1="50" x2="36" y2="66"/>' +
+      '<line x1="28" y1="30" x2="28" y2="38"/>' +
+      '<line x1="28" y1="38" x2="60" y2="42" style="stroke-width:3.4"/>' +
+      '</g>';
+    var roller = '<g class="gear">' +
+      '<circle cx="0.6" cy="-2.2" r="3.2" fill="none"/>' +
+      '<circle cx="3.2" cy="-0.6" r="2.3" fill="none"/>' +
+      '</g>';
+    return svg(floor(66) + machine + person({
+      x: 34, y: 48, dur: dur, torso: 14,
+      arms: [{ a: 24, e: 30 }],
+      legs: [{
+        a: -70, k: 22, thigh: 16, shin: 14, footLen: 6,
+        kAnim: '22;120;22',
+        footHtml: roller
       }]
     }));
   }
@@ -1611,6 +1638,7 @@
       case 'legpress': return legpress();
       case 'legext': return legext();
       case 'legcurl': return legcurl();
+      case 'legcurl-prone': return legcurlProne();
       case 'hipthrust': return thrust(true);
       case 'bridge': return thrust(false);
       case 'calf': return calf();
@@ -1645,7 +1673,8 @@
     [/\batr\b|poirier|handstand|appui tendu/, 'hs-free'],
     [/leg press|presse a cuisse|presse cuisse|presse jambe/, 'legpress'],
     [/leg extension|extension de jambe|extensions? de jambe/, 'legext'],
-    [/leg curl|curl allonge|ischio/, 'legcurl'],
+    [/leg curl assis|seated leg curls?/, 'legcurl'],
+    [/leg curl|curl allonge|ischio/, 'legcurl-prone'],
     [/hip ?thrust|releve de bassin/, 'hipthrust'],
     [/\bpont\b|glute bridge/, 'bridge'],
     [/mollets?|\bcalf\b|\bcalves\b/, 'calf'],
@@ -1749,6 +1778,15 @@
 
   function gifKey(name) {
     var n = foldName(name);
+    var key = matchGifKey(n);
+    if (key) return key;
+    // "Hip thrust machine" and "Leg curl assis machine" are the same exercises.
+    var stripped = n.replace(/ machine$/, '');
+    if (stripped !== n) return matchGifKey(stripped);
+    return '';
+  }
+
+  function matchGifKey(n) {
     if (GIF_ALIASES[n]) return GIF_ALIASES[n];
     if (/^(tractions? supination|tractions? en supination|chin ups?|chinups?)$/.test(n)) return 'chin-up';
     if (/^(face pulls?|face pulls? poulie|tirage visage)$/.test(n)) return 'face-pull';
@@ -1812,7 +1850,7 @@
     var key = gifKey(name), file = avatarGender + '/' + key + '.gif';
     if (!key || !GIF_ASSETS.has(file)) return '<span class="gif-pending">GIF à venir</span>';
     if (prefersStill()) return '<span class="gif-pending">Animation désactivée</span>';
-    return '<img class="exercise-gif" src="./assets/exercises/' + file + '?v=20261119" alt="" decoding="async">';
+    return '<img class="exercise-gif" src="./assets/exercises/' + file + '?v=20261124" alt="" decoding="async">';
   }
   function renderAll() {
     renderHeader();

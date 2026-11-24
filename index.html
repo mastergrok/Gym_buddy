@@ -233,6 +233,63 @@
       font-weight: 600;
     }
 
+    .ex-plan {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .ex-plan label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-size: 0.92rem;
+      font-weight: 650;
+      color: var(--hint);
+    }
+
+    .plan-stepper {
+      display: flex;
+      align-items: center;
+      width: 148px;
+      margin-left: auto;
+      flex: none;
+      min-height: 44px;
+      border-radius: 12px;
+      background: var(--secondary);
+    }
+
+    .plan-step {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text);
+      font-size: 1.35rem;
+      font-weight: 600;
+      line-height: 1;
+      touch-action: manipulation;
+    }
+
+    .plan-step:disabled { opacity: 0.35; }
+
+    .plan-value {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      padding: 0 2px;
+    }
+
     .rest-hint {
       color: var(--hint);
       font-size: 0.85rem;
@@ -975,6 +1032,107 @@
     };
   }
 
+  function planSnapshot() {
+    return programme.exercises.map(function (ex) {
+      var o = { sets: ex.sets };
+      if (ex.seconds != null) o.seconds = ex.seconds;
+      else o.reps = ex.reps;
+      o.weight = ex.weight != null ? ex.weight : null;
+      return o;
+    });
+  }
+
+  function applySavedPlan(plan) {
+    if (!Array.isArray(plan) || plan.length !== programme.exercises.length) return;
+    for (var i = 0; i < plan.length; i++) {
+      var src = plan[i];
+      var ex = programme.exercises[i];
+      if (!src || typeof src !== 'object') continue;
+      var sets = Math.round(Number(src.sets));
+      if (isFinite(sets) && sets >= 1 && sets <= 100) ex.sets = sets;
+      if (ex.seconds != null && src.seconds != null && src.seconds !== '') {
+        var sec = Number(src.seconds);
+        if (isFinite(sec) && sec >= 0) ex.seconds = round3(sec);
+      } else if (ex.reps != null && src.reps != null && src.reps !== '') {
+        var reps = Number(src.reps);
+        if (isFinite(reps) && reps >= 0) ex.reps = round3(reps);
+      }
+      if (!Object.prototype.hasOwnProperty.call(src, 'weight') || src.weight == null || src.weight === '') {
+        delete ex.weight;
+      } else {
+        var w = Number(src.weight);
+        if (isFinite(w) && w >= 0) {
+          ex.weight = round3(w);
+          if (!ex.unit) ex.unit = 'kg';
+        }
+      }
+    }
+  }
+
+  function weightStep(ex) {
+    var unit = String(ex.unit || 'kg').toLowerCase();
+    return unit.indexOf('kg') === 0 ? 2.5 : 1;
+  }
+
+  function doneInRow(i) {
+    var n = 0;
+    (cells[i] || []).forEach(function (cell) { if (cell.done) n += 1; });
+    return n;
+  }
+
+  function resizeSets(i, n) {
+    var ex = programme.exercises[i];
+    var row = cells[i];
+    while (row.length > n) {
+      var idx = -1;
+      for (var s = row.length - 1; s >= 0; s--) {
+        if (!row[s].done) { idx = s; break; }
+      }
+      if (idx < 0) break;
+      row.splice(idx, 1);
+      if (editAt && editAt.i === i) {
+        if (editAt.s === idx) editAt = null;
+        else if (editAt.s > idx) editAt.s -= 1;
+      }
+      if (hold && hold.i === i) {
+        if (hold.s === idx) clearHoldTimer();
+        else if (hold.s > idx) hold.s -= 1;
+      }
+    }
+    while (row.length < n) row.push(blankCell(ex));
+  }
+
+  function applyExercisePlan(i, next) {
+    if (sealed || !programme.exercises[i] || !cells[i]) return;
+    var ex = programme.exercises[i];
+    if (ex.seconds != null && next.seconds != null) ex.seconds = round3(Math.min(3600, Math.max(0, next.seconds)));
+    else if (ex.reps != null && next.reps != null) ex.reps = round3(Math.min(999, Math.max(0, next.reps)));
+    if (Object.prototype.hasOwnProperty.call(next, 'weight')) {
+      if (next.weight == null) delete ex.weight;
+      else {
+        ex.weight = round3(Math.min(999, Math.max(0, next.weight)));
+        if (!ex.unit) ex.unit = 'kg';
+      }
+    }
+    if (next.sets != null) {
+      var minSets = Math.max(1, doneInRow(i));
+      var count = Math.round(Number(next.sets));
+      if (!isFinite(count)) count = ex.sets;
+      if (count < minSets) count = minSets;
+      if (count > 100) count = 100;
+      resizeSets(i, count);
+      ex.sets = cells[i].length;
+    }
+    cells[i].forEach(function (cell) {
+      if (cell.done) return;
+      if (ex.seconds != null) cell.seconds = ex.seconds;
+      else cell.reps = ex.reps;
+      cell.weight = ex.weight != null ? ex.weight : null;
+    });
+    save();
+    renderAll();
+  }
+
   function round3(n) {
     return Math.round(Number(n) * 1000) / 1000;
   }
@@ -1041,6 +1199,7 @@
     storageSet(storageKey, JSON.stringify({
       v: 1,
       canon: CANON,
+      plan: planSnapshot(),
       started: started,
       restUntil: restRunning ? restUntil : 0,
       restTotal: restRunning ? restTotal : 0,
@@ -1064,11 +1223,18 @@
       var data = JSON.parse(raw);
       if (!data || data.v !== 1 || data.canon !== CANON) return;
       if (!Array.isArray(data.cells) || data.cells.length !== programme.exercises.length) return;
+      var backup = clone(programme);
+      if (Array.isArray(data.plan)) applySavedPlan(data.plan);
       var next = [];
+      var planOk = true;
       for (var i = 0; i < programme.exercises.length; i++) {
         var ex = programme.exercises[i];
-        if (!Array.isArray(data.cells[i]) || data.cells[i].length !== ex.sets) return;
+        if (!Array.isArray(data.cells[i]) || data.cells[i].length !== ex.sets) { planOk = false; break; }
         next.push(data.cells[i].map(function (cell) { return sanitizeCell(cell, ex); }));
+      }
+      if (!planOk) {
+        programme.exercises = backup.exercises;
+        return;
       }
       cells = next;
       if (typeof data.started === 'number' && data.started > 0 && data.started <= Date.now() + 2000) {
@@ -1912,6 +2078,8 @@
       target.className = 'target';
       target.textContent = formatTarget(ex);
 
+      var plan = renderPlan(ex, i);
+
       var rest = document.createElement('p');
       rest.className = 'rest-hint';
       rest.textContent = 'Repos ' + ex.rest + ' s';
@@ -1920,7 +2088,7 @@
       sets.className = 'sets';
       for (var s = 0; s < ex.sets; s++) sets.append(renderSet(ex, i, s));
 
-      card.append(head, target, rest, sets);
+      card.append(head, target, plan, rest, sets);
       var launch = renderHoldLaunch(ex, i);
       if (launch) card.append(launch);
       if (editAt && editAt.i === i) card.append(renderEditor(ex, editAt.s));
@@ -1937,6 +2105,125 @@
         }, 600);
       }
     }
+  }
+
+  function renderPlan(ex, i) {
+    var box = document.createElement('div');
+    box.className = 'ex-plan';
+    box.setAttribute('role', 'group');
+    box.setAttribute('aria-label', 'Réglage de ' + ex.name);
+
+    var minSets = Math.max(1, doneInRow(i));
+    box.append(planField(ex, i, 'sets', 'Séries', ex.sets, ex.sets <= minSets, ex.sets >= 100));
+
+    if (ex.seconds != null) {
+      box.append(planField(ex, i, 'reps', 'Secondes', ex.seconds, ex.seconds <= 0, ex.seconds >= 3600));
+    } else {
+      box.append(planField(ex, i, 'reps', 'Reps', ex.reps, ex.reps <= 0, ex.reps >= 999));
+    }
+
+    box.append(planField(
+      ex, i, 'weight', 'Poids',
+      ex.weight != null ? ex.weight : '',
+      ex.weight == null, ex.weight != null && ex.weight >= 999
+    ));
+    return box;
+  }
+
+  function planField(ex, i, kind, label, value, minusOff, plusOff) {
+    var field = document.createElement('label');
+    var name = document.createElement('span');
+    name.textContent = label;
+    var stepper = document.createElement('span');
+    stepper.className = 'plan-stepper';
+    stepper.append(planButton(ex, i, kind, -1, minusOff));
+    var input = document.createElement('input');
+    input.className = 'plan-value';
+    input.dataset.i = String(i);
+    input.dataset.plan = kind;
+    input.inputMode = 'decimal';
+    input.autocomplete = 'off';
+    input.enterKeyHint = 'done';
+    input.maxLength = 8;
+    input.setAttribute('aria-label', label + ' pour ' + ex.name);
+    if (value === '' || value == null) {
+      input.value = '';
+      input.placeholder = '–';
+    } else {
+      input.value = fmtNum(value);
+    }
+    if (sealed) input.disabled = true;
+    stepper.append(input);
+    stepper.append(planButton(ex, i, kind, 1, plusOff));
+    field.append(name, stepper);
+    return field;
+  }
+
+  function planButton(ex, i, kind, dir, disabled) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'plan-step';
+    btn.dataset.i = String(i);
+    btn.dataset.plan = kind;
+    btn.dataset.dir = String(dir);
+    btn.textContent = dir < 0 ? '−' : '+';
+    btn.disabled = !!disabled || sealed;
+    var what = kind === 'sets' ? 'séries' : (kind === 'weight' ? 'poids' : (ex.seconds != null ? 'secondes' : 'répétitions'));
+    btn.setAttribute('aria-label', (dir < 0 ? 'Diminuer' : 'Augmenter') + ' ' + what + ', ' + ex.name);
+    return btn;
+  }
+
+  var planLock = false;
+
+  function planBase(i, kind) {
+    var ex = programme.exercises[i];
+    var card = list.querySelector('.exercise[data-i="' + i + '"]');
+    var input = card && card.querySelector('input[data-plan="' + kind + '"]');
+    var typed = input ? parseNum(input.value) : null;
+    if (kind === 'sets') return typed != null ? typed : ex.sets;
+    if (kind === 'reps') return typed != null ? typed : (ex.seconds != null ? ex.seconds : ex.reps);
+    if (typed != null) return typed;
+    return ex.weight != null ? ex.weight : 0;
+  }
+
+  function stepPlan(i, kind, dir) {
+    var ex = programme.exercises[i];
+    if (!ex) return;
+    planLock = true;
+    var base = planBase(i, kind);
+    if (kind === 'sets') applyExercisePlan(i, { sets: base + dir });
+    else if (kind === 'reps') {
+      var effort = round3(base + dir);
+      if (effort < 0) effort = 0;
+      if (ex.seconds != null) applyExercisePlan(i, { seconds: effort });
+      else applyExercisePlan(i, { reps: effort });
+    } else {
+      var next = round3(base + dir * weightStep(ex));
+      if (next <= 0) applyExercisePlan(i, { weight: null });
+      else applyExercisePlan(i, { weight: next });
+    }
+    setTimeout(function () { planLock = false; }, 0);
+  }
+
+  function commitPlanInput(i, kind, raw) {
+    if (planLock) return;
+    var ex = programme.exercises[i];
+    if (!ex) return;
+    if (kind === 'weight' && String(raw).trim() === '') {
+      applyExercisePlan(i, { weight: null });
+      return;
+    }
+    var n = parseNum(raw);
+    if (n == null || n < 0) {
+      renderExercises();
+      return;
+    }
+    if (kind === 'sets') applyExercisePlan(i, { sets: n });
+    else if (kind === 'reps') {
+      if (ex.seconds != null) applyExercisePlan(i, { seconds: n });
+      else applyExercisePlan(i, { reps: n });
+    } else if (n === 0) applyExercisePlan(i, { weight: null });
+    else applyExercisePlan(i, { weight: n });
   }
 
   function renderSet(ex, i, s) {
@@ -2881,6 +3168,7 @@
   }, true);
 
   list.addEventListener('click', function (e) {
+    if (e.target.closest('.plan-step')) return;
     var launchBtn = e.target.closest('.hold-launch');
     if (launchBtn) {
       if (launchBtn.dataset.hold === 'cancel') clearHoldTimer();
@@ -2914,7 +3202,18 @@
     toggleSet(Number(setBtn.dataset.i), Number(setBtn.dataset.s));
   });
 
+  list.addEventListener('change', function (e) {
+    var input = e.target.closest('.plan-value');
+    if (!input) return;
+    commitPlanInput(Number(input.dataset.i), input.dataset.plan, input.value);
+  });
+
   list.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.classList.contains('plan-value')) {
+      e.preventDefault();
+      e.target.blur();
+      return;
+    }
     if (e.key === 'Enter' && e.target.closest('#editor')) {
       e.preventDefault();
       commitEdit();
@@ -2926,6 +3225,14 @@
 
   var pressTimer = 0;
   list.addEventListener('pointerdown', function (e) {
+    var planBtn = e.target.closest('.plan-step');
+    if (planBtn) {
+      if (!planBtn.disabled) {
+        e.preventDefault();
+        stepPlan(Number(planBtn.dataset.i), planBtn.dataset.plan, Number(planBtn.dataset.dir));
+      }
+      return;
+    }
     var setBtn = e.target.closest('.set');
     if (!setBtn || e.button > 0) return;
     var i = Number(setBtn.dataset.i);
